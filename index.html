@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>لعبة الرموز المشوشة - مع زر التعليمات</title>
+  <style>
+    body {
+      background: #111;
+      color: #fff;
+      font-family: sans-serif;
+      text-align: center;
+      direction: rtl;
+      padding: 20px;
+    }
+    h1, h2, h3 {
+      color: #f0db4f;
+    }
+    input, button, select {
+      font-size: 1em;
+      padding: 10px;
+      margin: 5px;
+      border-radius: 5px;
+      border: none;
+    }
+    button {
+      background: #007acc;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #005fa3;
+    }
+    .hidden { display: none; }
+    .player-list { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
+    .player { background: #333; margin: 5px; padding: 10px 15px; border-radius: 5px; cursor: pointer; }
+    .player:hover { background: #444; }
+    #timerDisplay { font-size: 20px; margin: 10px; color: #f77; }
+    #equationBox { font-size: 2em; margin: 20px; }
+    #answerBox { font-size: 1.2em; color: #f77; margin-top: 10px; min-height: 1.2em; }
+    #scoreBoard { list-style: none; padding: 0; margin-top: 20px; }
+    #scoreBoard li { margin: 5px 0; }
+    #nav-buttons { margin-top: 15px; }
+    #nav-buttons button { background: #444; }
+    #instructions { text-align: right; max-width: 600px; margin: 0 auto; }
+    #instructions p { margin: 10px 0; line-height: 1.5; }
+  </style>
+</head>
+<body>
+	<div class="developer">
+    <h2>𖤍 | 𝐑𝐄𝐃𝐒𝐖𝐎𝐑𝐃 & فريق تطوير 𝐒𝐒𝐎</h2>
+    <ul>
+      <li><strong>𖤍 | 𝐑𝐄𝐃𝐒𝐖𝐎𝐑𝐃</strong> –  برمجة وتصميم وتطوير </li>
+    </ul>
+  </div>
+
+  <h1>لعبة الرموز المشوشة</h1>
+
+  <div id="nav-buttons">
+    <button onclick="showInstructions()">صفحة التعليمات</button>
+    <button onclick="showGame()">العودة للعبة</button>
+  </div>
+
+  <!-- صفحة التعليمات -->
+  <div id="instructions" class="hidden">
+    <h2>كيف تلعب</h2>
+    <p>1. اختر عدد اللاعبين (2–8) ثم اضغط "تأكيد".</p>
+    <p>2. سيدخل المضيف أسماء اللاعبين صوتيًا عند المطالبة.</p>
+    <p>3. تظهر في كل جولة معادلة من رمزين، اضغط "نسخ المعادلة" ليتمكن المشاركون من التخمين.</p>
+    <p>4. اضغط "ابدأ المؤقت" ليبدأ العد التنازلي؛ عند انتهاء الوقت يظهر زر "التالي".</p>
+    <p>5. أخبر المضيف من خمّن الإجابة الصحيحة أولًا ثم اضغط الزر بجوار اسمه لكسب نقطة.</p>
+    <p>6. يكون لديك زر "إظهار الجواب" ليكشف الجواب الصحيح للمضيف فقط.</p>
+    <p>7. بعد كل جولة اضغط "التالي" للانتقال للجولة التالية.</p>
+    <p>8. عند انتهاء جميع الجولات، تظهر النتيجة النهائية والفائز.</p>
+  </div>
+
+  <!-- إعداد اللعبة -->
+  <div id="setup">
+    <h2>إعداد اللعبة</h2>
+    <label>عدد اللاعبين:
+      <input type="number" id="playerCount" value="2" min="2" max="8"/>
+    </label>
+    <button onclick="setupPlayers()">تأكيد</button>
+  </div>
+
+  <!-- منطقة اللعبة -->
+  <div id="gameArea" class="hidden">
+    <h2>الجولة <span id="roundNumber">1</span></h2>
+    <div id="equationBox">？？？</div>
+    <button id="showAnswerBtn" onclick="showAnswer()">إظهار الجواب</button>
+    <div id="answerBox"></div>
+
+    <button onclick="copyEquation()">نسخ المعادلة</button>
+
+    <div>
+      <label>مدة الجولة (ثواني):
+        <input type="number" id="timeInput" value="30" style="width:80px;" />
+      </label>
+      <button onclick="startTimer()">ابدأ المؤقت</button>
+      <div id="timerDisplay">--</div>
+    </div>
+
+    <h3>من أجاب؟</h3>
+    <div class="player-list" id="playerBtns"></div>
+
+    <button id="nextBtn" class="hidden" onclick="nextEquation()">التالي</button>
+
+    <h3>النقاط:</h3>
+    <ul id="scoreBoard"></ul>
+
+    <button id="endGameBtn" onclick="endGame()">إنهاء اللعبة</button>
+  </div>
+
+  <script>
+    const questions = [
+  {
+    "equation": "🎂 + 🎉 = ؟",
+    "answer": " عيد ميلاد"
+  },
+  {
+    "equation": "🍽️ + 🍷 = ؟",
+    "answer": "عشاء"
+  },
+  {
+    "equation": "🎓 + 📚 + 🏆 = ؟",
+    "answer": "تخرج"
+  },
+  {
+    "equation": "🍿 + 🍫 + 🎥 = ؟",
+    "answer": "ترفيه"
+  },
+  {
+    "equation": "🎶 + 🍽️ + 🍷 = ؟",
+    "answer": "عشاء"
+  },
+  {
+    "equation": "🎟️ + 🍿 + 🎬 = ؟",
+    "answer": "سينما"
+  },
+  {
+    "equation": "💔 + 💕 = ؟",
+    "answer": "حب"
+  },
+  {
+    "equation": "🎻 + 🎼 + 🎷 = ؟",
+    "answer": "موسيقى"
+  },
+  {
+    "equation": "🌴 + 🏊‍♂️ + 🏝️ = ؟",
+    "answer": "جزيرة"
+  },
+  {
+    "equation": "🕶️ + 🏖️ + 🌊 = ؟",
+    "answer": "شاطئ"
+  },
+  {
+    "equation": "🍐 + 🍏 + 🍎 = ؟",
+    "answer": "فاكهة"
+  },
+  {
+    "equation": "👶 + 🍼 = ؟",
+    "answer": "طفل"
+  },
+  {
+    "equation": "🎬 + 🎟️ = ؟",
+    "answer": "سينما"
+  },
+  {
+    "equation": "⚽ + 🥅 + 🏟️ = ؟",
+    "answer": "كرة"
+  },
+  {
+    "equation": "🚗 + ⛽ + 🛣️ = ؟",
+    "answer": "رحلة"
+  },
+  {
+    "equation": "🎷 + 🎼 = ؟",
+    "answer": "موسيقى"
+  },
+  {
+    "equation": "🥤 + 🍉 + 🍦 = ؟",
+    "answer": "مرطبات"
+  },
+  {
+    "equation": "🏝️ + 🏊‍♂️ = ؟",
+    "answer": "جزيرة"
+  },
+  {
+    "equation": "🚲 + 🎽 = ؟",
+    "answer": "رياضة"
+  },
+  {
+    "equation": "🎶 + 🍽️ = ؟",
+    "answer": "عشاء"
+  },
+  {
+    "equation": "🎽 + 🛤️ = ؟",
+    "answer": "رياضة"
+  },
+  {
+    "equation": "🍐 + 🍎 = ؟",
+    "answer": "فاكهة"
+  },
+  {
+    "equation": "🎨 + 🖌️ = ؟",
+    "answer": "فن"
+  },
+  {
+    "equation": "☕ + 💻 = ؟",
+    "answer": "عمل"
+  },
+  {
+    "equation": "👟 + 🕒 = ؟",
+    "answer": "جري"
+  },
+  {
+    "equation": "📷 + 🌅 + 👥 = ؟",
+    "answer": "صورة"
+  },
+  {
+    "equation": "🍼 + 👶 = ؟",
+    "answer": "طفل"
+  },
+  {
+    "equation": "📷 + 👥 = ؟",
+    "answer": "صورة"
+  },
+  {
+    "equation": "🔭 + 🔬 + 🧪 = ؟",
+    "answer": "علم"
+  },
+  {
+    "equation": "🍏 + 🍎 = ؟",
+    "answer": "فاكهة"
+  },
+  {
+    "equation": "🎶 + 🍷 = ؟",
+    "answer": "عشاء"
+  },
+  {
+    "equation": "🛍️ + 💳 = ؟",
+    "answer": "تسوق"
+  },
+  {
+    "equation": "🍪 + 🥛 + 🍼 = ؟",
+    "answer": "وجبة"
+  },
+  {
+    "equation": "🪥 + 🧼 = ؟",
+    "answer": "نظافة"
+  },
+  {
+    "equation": "🌴 + 🏝️ = ؟",
+    "answer": "جزيرة"
+  },
+  {
+    "equation": "🔭 + 🧪 + 🔬 = ؟",
+    "answer": "علم"
+  },
+  {
+    "equation": "🥤 + 🍦 = ؟",
+    "answer": "مرطبات"
+  },
+  {
+    "equation": "👶 + 🧸 + 🍼 = ؟",
+    "answer": "طفل"
+  },
+  {
+    "equation": "🏝️ + 🏊‍♂️ + 🌴 = ؟",
+    "answer": "جزيرة"
+  },
+  {
+    "equation": "🚪 + 🔑 + 🏠 = ؟",
+    "answer": "منزل"
+  },
+  {
+    "equation": "🏟️ + ⚽ = ؟",
+    "answer": "كرة"
+  },
+  {
+    "equation": "🧪 + 🔬 + 🔭 = ؟",
+    "answer": "علم"
+  },
+  {
+    "equation": "🍿 + 🍫 = ؟",
+    "answer": "ترفيه"
+  },
+  {
+    "equation": "🧳 + 🛂 + ✈️ = ؟",
+    "answer": "سفر"
+  },
+  {
+    "equation": "📰 + 🥐 + ☕ = ؟",
+    "answer": "فطور"
+  },
+  {
+    "equation": "🔑 + 🚪 + 🏠 = ؟",
+    "answer": "منزل"
+  },
+  {
+    "equation": "🍦 + 🍉 + 🥤 = ؟",
+    "answer": "مرطبات"
+  },
+  {
+    "equation": "🐱 + 🐶 + 🐭 = ؟",
+    "answer": "حيوانات"
+  },
+  {
+    "equation": "💔 + ❤️ = ؟",
+    "answer": "حب"
+  },
+  {
+    "equation": "⚽ + 🏟️ = ؟",
+    "answer": "كرة"
+  },
+  {
+    "equation": "🐭 + 🐶 + 🐱 = ؟",
+    "answer": "حيوانات"
+  },
+  {
+    "equation": "❤️ + 💕 + 💔 = ؟",
+    "answer": "حب"
+  },
+  {
+    "equation": "🥤 + 🍉 = ؟",
+    "answer": "مرطبات"
+  },
+  {
+    "equation": "🏠 + 🔑 = ؟",
+    "answer": "منزل"
+  },
+  {
+    "equation": "🪥 + 🚿 = ؟",
+    "answer": "نظافة"
+  },
+  {
+    "equation": "🎓 + 🏆 + 📚 = ؟",
+    "answer": "تخرج"
+  },
+  {
+    "equation": "🌧️ + ☔ + 🌈 = ؟",
+    "answer": "مطر"
+  },
+  {
+    "equation": "🍼 + 🥛 = ؟",
+    "answer": "وجبة"
+  },
+  {
+    "equation": "🏝️ + 🌴 = ؟",
+    "answer": "جزيرة"
+  },
+  {
+    "equation": "🛍️ + 🛒 + 💳 = ؟",
+    "answer": "تسوق"
+  },
+  {
+    "equation": "🧼 + 🪥 + 🚿 = ؟",
+    "answer": "نظافة"
+  },
+  {
+    "equation": "🛤️ + 🎽 = ؟",
+    "answer": "رياضة"
+  },
+  {
+    "equation": "🍽️ + 🎶 = ؟",
+    "answer": "عشاء"
+  },
+  {
+    "equation": "🍦 + 🥤 + 🍉 = ؟",
+    "answer": "مرطبات"
+  },
+  {
+    "equation": "🐱 + 🐭 = ؟",
+    "answer": "حيوانات"
+  },
+  {
+    "equation": "🏃‍♂️ + 👟 + 🕒 = ؟",
+    "answer": "جري"
+  },
+  {
+    "equation": "✏️ + 🏫 + 📚 = ؟",
+    "answer": "مدرسة"
+  },
+  {
+    "equation": "🕒 + 🏃‍♂️ + 👟 = ؟",
+    "answer": "جري"
+  },
+  {
+    "equation": "🍦 + 🥤 = ؟",
+    "answer": "مرطبات"
+  },
+  {
+    "equation": "📚 + ✏️ + 🏫 = ؟",
+    "answer": "مدرسة"
+  },
+  {
+    "equation": "🕶️ + 🌊 + 🏖️ = ؟",
+    "answer": "شاطئ"
+  },
+  {
+    "equation": "🚲 + 🛤️ = ؟",
+    "answer": "رياضة"
+  },
+  {
+    "equation": "🕶️ + 🌊 = ؟",
+    "answer": "شاطئ"
+  },
+  {
+    "equation": "🥤 + 🍦 + 🍉 = ؟",
+    "answer": "مرطبات"
+  },
+  {
+    "equation": "🎥 + 🍫 = ؟",
+    "answer": "ترفيه"
+  },
+  {
+    "equation": "🍪 + 🥛 = ؟",
+    "answer": "وجبة"
+  },
+  {
+    "equation": "🛤️ + 🚲 + 🎽 = ؟",
+    "answer": "رياضة"
+  },
+  {
+    "equation": "🧳 + ✈️ = ؟",
+    "answer": "سفر"
+  },
+  {
+    "equation": "🖌️ + 🖼️ = ؟",
+    "answer": "فن"
+  },
+  {
+    "equation": "🏃‍♂️ + 👟 = ؟",
+    "answer": "جري"
+  },
+  {
+    "equation": "🥅 + 🏟️ = ؟",
+    "answer": "كرة"
+  },
+  {
+    "equation": "🏠 + 🔑 + 🚪 = ؟",
+    "answer": "منزل"
+  },
+  {
+    "equation": "🍼 + 🍪 + 🥛 = ؟",
+    "answer": "وجبة"
+  },
+  {
+    "equation": "☕ + 🥐 = ؟",
+    "answer": "فطور"
+  },
+  {
+    "equation": "🏠 + 🚪 = ؟",
+    "answer": "منزل"
+  },
+  {
+    "equation": "🧸 + 👶 = ؟",
+    "answer": "طفل"
+  },
+  {
+    "equation": "🚿 + 🧼 + 🪥 = ؟",
+    "answer": "نظافة"
+  },
+  {
+    "equation": "🚗 + ⛽ = ؟",
+    "answer": "رحلة"
+  },
+  {
+    "equation": "👥 + 📷 + 🌅 = ؟",
+    "answer": "صورة"
+  },
+  {
+    "equation": "🎓 + 📚 = ؟",
+    "answer": "تخرج"
+  },
+  {
+    "equation": "🍿 + 🎟️ = ؟",
+    "answer": "سينما"
+  },
+  {
+    "equation": "🏝️ + 🌴 + 🏊‍♂️ = ؟",
+    "answer": "جزيرة"
+  },
+  {
+    "equation": "📋 + ☕ = ؟",
+    "answer": "عمل"
+  },
+  {
+    "equation": "🏟️ + 🥅 + ⚽ = ؟",
+    "answer": "كرة"
+  },
+  {
+    "equation": "🌊 + 🏖️ = ؟",
+    "answer": "شاطئ"
+  },
+  {
+    "equation": "🚲 + 🎽 + 🛤️ = ؟",
+    "answer": "رياضة"
+  },
+  {
+    "equation": "🛣️ + 🚗 + ⛽ = ؟",
+    "answer": "رحلة"
+  },
+  {
+    "equation": "🏆 + 🎓 + 📚 = ؟",
+    "answer": "تخرج"
+  },
+  {
+    "equation": "🎥 + 🍿 = ؟",
+    "answer": "ترفيه"
+  },
+  {
+    "equation": "🐶 + 🐭 = ؟",
+    "answer": "حيوانات"
+  },
+  {
+    "equation": "🌙 + 🛏️ = ؟",
+    "answer": "نوم"
+  },
+  {
+    "equation": "🎟️ + 🎬 = ؟",
+    "answer": "سينما"
+  },
+  {
+    "equation": "🏆 + 📚 + 🎓 = ؟",
+    "answer": "تخرج"
+  },
+  {
+    "equation": "🖌️ + 🎨 + 🖼️ = ؟",
+    "answer": "فن"
+  },
+  {
+    "equation": "🛂 + ✈️ + 🧳 = ؟",
+    "answer": "سفر"
+  },
+  {
+    "equation": "🏟️ + 🥅 = ؟",
+    "answer": "كرة"
+  },
+  {
+    "equation": "🍿 + 🎥 + 🍫 = ؟",
+    "answer": "ترفيه"
+  },
+  {
+    "equation": "🏆 + 🎓 = ؟",
+    "answer": "تخرج"
+  },
+  {
+    "equation": "🛤️ + 🚲 = ؟",
+    "answer": "رياضة"
+  },
+  {
+    "equation": "🌙 + 🛏️ + 😴 = ؟",
+    "answer": "نوم"
+  },
+  {
+    "equation": "😴 + 🌙 + 🛏️ = ؟",
+    "answer": "نوم"
+  },
+  {
+    "equation": "🍷 + 🎶 + 🍽️ = ؟",
+    "answer": "عشاء"
+  },
+  {
+    "equation": "🎼 + 🎷 = ؟",
+    "answer": "موسيقى"
+  },
+  {
+    "equation": "🛒 + 💳 = ؟",
+    "answer": "تسوق"
+  },
+  {
+    "equation": "🚪 + 🏠 + 🔑 = ؟",
+    "answer": "منزل"
+  },
+  {
+    "equation": "💔 + 💕 + ❤️ = ؟",
+    "answer": "حب"
+  },
+  {
+    "equation": "✏️ + 🏫 = ؟",
+    "answer": "مدرسة"
+  },
+  {
+    "equation": "🏖️ + 🕶️ = ؟",
+    "answer": "شاطئ"
+  },
+  {
+    "equation": "🌅 + 📷 + 👥 = ؟",
+    "answer": "صورة"
+  },
+  {
+    "equation": "🎥 + 🍫 + 🍿 = ؟",
+    "answer": "ترفيه"
+  },
+  {
+    "equation": "🐱 + 🐶 = ؟",
+    "answer": "حيوانات"
+  },
+  {
+    "equation": "🚗 + 🛣️ = ؟",
+    "answer": "رحلة"
+  },
+  {
+    "equation": "🛣️ + ⛽ = ؟",
+    "answer": "رحلة"
+  },
+  {
+    "equation": "🔑 + 🏠 + 🚪 = ؟",
+    "answer": "منزل"
+  },
+  {
+    "equation": "🌧️ + 🌈 + ☔ = ؟",
+    "answer": "مطر"
+  },
+  {
+    "equation": "🍐 + 🍎 + 🍏 = ؟",
+    "answer": "فاكهة"
+  },
+  {
+    "equation": "🖼️ + 🖌️ + 🎨 = ؟",
+    "answer": "فن"
+  },
+  {
+    "equation": "🌊 + 🕶️ + 🏖️ = ؟",
+    "answer": "شاطئ"
+  },
+  {
+    "equation": "💬 + 📱 + 📞 = ؟",
+    "answer": "مكالمة"
+  },
+  {
+    "equation": "📋 + ☕ + 💻 = ؟",
+    "answer": "عمل"
+  },
+  {
+    "equation": "👟 + 🕒 + 🏃‍♂️ = ؟",
+    "answer": "جري"
+  },
+  {
+    "equation": "📷 + 👥 + 🌅 = ؟",
+    "answer": "صورة"
+  },
+  {
+    "equation": "👶 + 🍼 + 🧸 = ؟",
+    "answer": "طفل"
+  },
+  {
+    "equation": "🕯️ + 🎉 = ؟",
+    "answer": "عيد"
+  },
+  {
+    "equation": "🎷 + 🎼 + 🎻 = ؟",
+    "answer": "موسيقى"
+  },
+  {
+    "equation": "🎻 + 🎷 + 🎼 = ؟",
+    "answer": "موسيقى"
+  },
+  {
+    "equation": "🎉 + 🕯️ + 🎂 = ؟",
+    "answer": "عيد"
+  },
+  {
+    "equation": "🛂 + 🧳 + ✈️ = ؟",
+    "answer": "سفر"
+  },
+  {
+    "equation": "🚗 + 🛣️ + ⛽ = ؟",
+    "answer": "رحلة"
+  },
+  {
+    "equation": "🧪 + 🔭 + 🔬 = ؟",
+    "answer": "علم"
+  },
+  {
+    "equation": "🌴 + 🏝️ + 🏊‍♂️ = ؟",
+    "answer": "جزيرة"
+  },
+  {
+    "equation": "📰 + ☕ = ؟",
+    "answer": "فطور"
+  },
+  {
+    "equation": "🌈 + ☔ + 🌧️ = ؟",
+    "answer": "مطر"
+  },
+  {
+    "equation": "🎨 + 🖼️ + 🖌️ = ؟",
+    "answer": "فن"
+  },
+  {
+    "equation": "🍎 + 🍐 + 🍏 = ؟",
+    "answer": "فاكهة"
+  },
+  {
+    "equation": "🔭 + 🧪 = ؟",
+    "answer": "علم"
+  },
+  {
+    "equation": "🔑 + 🚪 = ؟",
+    "answer": "منزل"
+  },
+  {
+    "equation": "☔ + 🌧️ = ؟",
+    "answer": "مطر"
+  },
+  {
+    "equation": "🏃‍♂️ + 🕒 + 👟 = ؟",
+    "answer": "جري"
+  },
+  {
+    "equation": "🪥 + 🧼 + 🚿 = ؟",
+    "answer": "نظافة"
+  },
+  {
+    "equation": "🍿 + 🎟️ + 🎬 = ؟",
+    "answer": "سينما"
+  },
+  {
+    "equation": "🕯️ + 🎂 + 🎉 = ؟",
+    "answer": "عيد"
+  },
+  {
+    "equation": "🏖️ + 🌊 + 🕶️ = ؟",
+    "answer": "شاطئ"
+  },
+  {
+    "equation": "🍪 + 🍼 + 🥛 = ؟",
+    "answer": "وجبة"
+  },
+  {
+    "equation": "💬 + 📱 = ؟",
+    "answer": "مكالمة"
+  },
+  {
+    "equation": "💔 + ❤️ + 💕 = ؟",
+    "answer": "حب"
+  },
+  {
+    "equation": "🍪 + 🍼 = ؟",
+    "answer": "وجبة"
+  },
+  {
+    "equation": "🛍️ + 💳 + 🛒 = ؟",
+    "answer": "تسوق"
+  },
+  {
+    "equation": "🧸 + 👶 + 🍼 = ؟",
+    "answer": "طفل"
+  },
+  {
+    "equation": "🍎 + 🍏 = ؟",
+    "answer": "فاكهة"
+  },
+  {
+    "equation": "⚽ + 🥅 = ؟",
+    "answer": "كرة"
+  },
+  {
+    "equation": "🏫 + 📚 = ؟",
+    "answer": "مدرسة"
+  },
+  {
+    "equation": "🌅 + 👥 + 📷 = ؟",
+    "answer": "صورة"
+  },
+  {
+    "equation": "🌧️ + ☔ = ؟",
+    "answer": "مطر"
+  },
+  {
+    "equation": "🚿 + 🧼 = ؟",
+    "answer": "نظافة"
+  },
+  {
+    "equation": "🛒 + 💳 + 🛍️ = ؟",
+    "answer": "تسوق"
+  },
+  {
+    "equation": "❤️ + 💔 = ؟",
+    "answer": "حب"
+  },
+  {
+    "equation": "🍏 + 🍐 + 🍎 = ؟",
+    "answer": "فاكهة"
+  },
+  {
+    "equation": "🎉 + 🕯️ = ؟",
+    "answer": "عيد"
+  },
+  {
+    "equation": "🍫 + 🎥 + 🍿 = ؟",
+    "answer": "ترفيه"
+  },
+  {
+    "equation": "🧳 + ✈️ + 🛂 = ؟",
+    "answer": "سفر"
+  },
+  {
+    "equation": "📱 + 📞 = ؟",
+    "answer": "مكالمة"
+  },
+  {
+    "equation": "🥛 + 🍪 = ؟",
+    "answer": "وجبة"
+  },
+  {
+    "equation": "🎶 + 🍷 + 🍽️ = ؟",
+    "answer": "عشاء"
+  },
+  {
+    "equation": "🔬 + 🧪 + 🔭 = ؟",
+    "answer": "علم"
+  },
+  {
+    "equation": "🧪 + 🔬 = ؟",
+    "answer": "علم"
+  },
+  {
+    "equation": "🎂 + 🕯️ = ؟",
+    "answer": "عيد"
+  },
+  {
+    "equation": "🐶 + 🐭 + 🐱 = ؟",
+    "answer": "حيوانات"
+  },
+  {
+    "equation": "🍉 + 🍦 = ؟",
+    "answer": "مرطبات"
+  },
+  {
+    "equation": "🥅 + ⚽ = ؟",
+    "answer": "كرة"
+  },
+  {
+    "equation": "🚿 + 🪥 = ؟",
+    "answer": "نظافة"
+  },
+  {
+    "equation": "💻 + ☕ + 📋 = ؟",
+    "answer": "عمل"
+  },
+  {
+    "equation": "🔬 + 🧪 = ؟",
+    "answer": "علم"
+  },
+  {
+    "equation": "🍉 + 🥤 = ؟",
+    "answer": "مرطبات"
+  },
+  {
+    "equation": "🎻 + 🎷 = ؟",
+    "answer": "موسيقى"
+  },
+  {
+    "equation": "🍦 + 🍉 = ؟",
+    "answer": "مرطبات"
+  },
+  {
+    "equation": "🕶️ + 🏖️ = ؟",
+    "answer": "شاطئ"
+  },
+  {
+    "equation": "🎼 + 🎷 + 🎻 = ؟",
+    "answer": "موسيقى"
+  },
+  {
+    "equation": "🍫 + 🎥 = ؟",
+    "answer": "ترفيه"
+  },
+  {
+    "equation": "🍏 + 🍐 = ؟",
+    "answer": "فاكهة"
+  },
+  {
+    "equation": "🐶 + 🐱 = ؟",
+    "answer": "حيوانات"
+  },
+  {
+    "equation": "🍼 + 🧸 + 👶 = ؟",
+    "answer": "طفل"
+  },
+  {
+    "equation": "🚪 + 🏠 = ؟",
+    "answer": "منزل"
+  },
+  {
+    "equation": "💳 + 🛍️ = ؟",
+    "answer": "تسوق"
+  },
+  {
+    "equation": "🍼 + 🥛 + 🍪 = ؟",
+    "answer": "وجبة"
+  },
+  {
+    "equation": "💕 + 💔 + ❤️ = ؟",
+    "answer": "حب"
+  },
+  {
+    "equation": "📰 + 🥐 = ؟",
+    "answer": "فطور"
+  },
+  {
+    "equation": "🕒 + ?? = ؟",
+    "answer": "جري"
+  },
+  {
+    "equation": "🐭 + 🐶 = ؟",
+    "answer": "حيوانات"
+  },
+  {
+    "equation": "☕ + 📋 = ؟",
+    "answer": "عمل"
+  },
+  {
+    "equation": "🌴 + 🏊‍♂️ = ؟",
+    "answer": "جزيرة"
+  },
+  {
+    "equation": "📚 + 🏫 = ؟",
+    "answer": "مدرسة"
+  },
+  {
+    "equation": "🍽️ + 🎶 + 🍷 = ؟",
+    "answer": "عشاء"
+  },
+  {
+    "equation": "🥛 + 🍪 + 🍼 = ؟",
+    "answer": "وجبة"
+  },
+  {
+    "equation": "🛣️ + 🚗 = ؟",
+    "answer": "رحلة"
+  },
+  {
+    "equation": "🌧️ + 🌈 = ؟",
+    "answer": "مطر"
+  },
+  {
+    "equation": "🎬 + 🎟️ + 🍿 = ؟",
+    "answer": "سينما"
+  },
+  {
+    "equation": "🧳 + 🛂 = ؟",
+    "answer": "سفر"
+  },
+  {
+    "equation": "🎼 + 🎻 + 🎷 = ؟",
+    "answer": "موسيقى"
+  },
+  {
+    "equation": "🎉 + 🎂 + 🕯️ = ؟",
+    "answer": "عيد"
+  },
+  {
+    "equation": "📞 + 💬 + 📱 = ؟",
+    "answer": "مكالمة"
+  },
+  {
+    "equation": "☕ + 📰 + 🥐 = ؟",
+    "answer": "فطور"
+  },
+  {
+    "equation": "📱 + 📞 + 💬 = ؟",
+    "answer": "مكالمة"
+  },
+  {
+    "equation": "🍉 + 🥤 + 🍦 = ؟",
+    "answer": "مرطبات"
+  },
+  {
+    "equation": "👥 + 📷 = ؟",
+    "answer": "صورة"
+  },
+  {
+    "equation": "📚 + 🎓 = ؟",
+    "answer": "تخرج"
+  },
+  {
+    "equation": "🖌️ + 🎨 = ؟",
+    "answer": "فن"
+  },
+  {
+    "equation": "✏️ + 📚 + 🏫 = ؟",
+    "answer": "مدرسة"
+  },
+  {
+    "equation": "🔑 + 🏠 = ؟",
+    "answer": "منزل"
+  },
+  {
+    "equation": "🎂 + 🎉 + 🕯️ = ؟",
+    "answer": "عيد"
+  },
+  {
+    "equation": "💕 + 💔 = ؟",
+    "answer": "حب"
+  },
+  {
+    "equation": "🌈 + 🌧️ + ☔ = ؟",
+    "answer": "مطر"
+  },
+  {
+    "equation": "🍏 + 🍎 + 🍐 = ؟",
+    "answer": "فاكهة"
+  },
+  {
+    "equation": "😴 + 🛏️ + 🌙 = ؟",
+    "answer": "نوم"
+  },
+  {
+    "equation": "📚 + 🏫 + ✏️ = ؟",
+    "answer": "مدرسة"
+  },
+  {
+    "equation": "🏖️ + 🌊 = ؟",
+    "answer": "شاطئ"
+  },
+  {
+    "equation": "☔ + 🌧️ + 🌈 = ؟",
+    "answer": "مطر"
+  },
+  {
+    "equation": "👥 + 🌅 + 📷 = ؟",
+    "answer": "صورة"
+  },
+  {
+    "equation": "🍫 + 🍿 = ؟",
+    "answer": "ترفيه"
+  },
+  {
+    "equation": "🏫 + ✏️ = ؟",
+    "answer": "مدرسة"
+  },
+  {
+    "equation": "🥅 + ⚽ + 🏟️ = ؟",
+    "answer": "كرة"
+  },
+  {
+    "equation": "✈️ + 🛂 + 🧳 = ؟",
+    "answer": "سفر"
+  },
+  {
+    "equation": "⛽ + 🚗 + 🛣️ = ؟",
+    "answer": "رحلة"
+  },
+  {
+    "equation": "🛏️ + 🌙 + 😴 = ؟",
+    "answer": "نوم"
+  },
+  {
+    "equation": "👥 + 🌅 = ؟",
+    "answer": "صورة"
+  },
+  {
+    "equation": "🎷 + 🎻 + 🎼 = ؟",
+    "answer": "موسيقى"
+  },
+  {
+    "equation": "🏠 + 🚪 + 🔑 = ؟",
+    "answer": "منزل"
+  },
+  {
+    "equation": "🚲 + 🛤️ + 🎽 = ؟",
+    "answer": "رياضة"
+  },
+  {
+    "equation": "📱 + 💬 + 📞 = ؟",
+    "answer": "مكالمة"
+  },
+  {
+    "equation": "🕯️ + 🎂 = ؟",
+    "answer": "عيد"
+  },
+  {
+    "equation": "👶 + 🧸 = ؟",
+    "answer": "طفل"
+  },
+  {
+    "equation": "🎻 + 🎼 = ؟",
+    "answer": "موسيقى"
+  },
+  {
+    "equation": "🎽 + 🛤️ + 🚲 = ؟",
+    "answer": "رياضة"
+  },
+  {
+    "equation": "💳 + 🛒 = ؟",
+    "answer": "تسوق"
+  },
+  {
+    "equation": "☕ + 🥐 + 📰 = ؟",
+    "answer": "فطور"
+  },
+  {
+    "equation": "🎉 + 🎂 = ؟",
+    "answer": "عيد"
+  },
+  {
+    "equation": "🥐 + ☕ = ؟",
+    "answer": "فطور"
+  },
+  {
+    "equation": "🏊‍♂️ + 🏝️ + 🌴 = ؟",
+    "answer": "جزيرة"
+  },
+  {
+    "equation": "🎟️ + 🎬 + 🍿 = ؟",
+    "answer": "سينما"
+  },
+  {
+    "equation": "🥐 + 📰 + ☕ = ؟",
+    "answer": "فطور"
+  },
+  {
+    "equation": "🥛 + 🍼 + 🍪 = ؟",
+    "answer": "وجبة"
+  },
+  {
+    "equation": "✈️ + 🧳 = ؟",
+    "answer": "سفر"
+  },
+  {
+    "equation": "🍷 + 🎶 = ؟",
+    "answer": "عشاء"
+  },
+  {
+    "equation": "🌊 + 🏖️ + 🕶️ = ؟",
+    "answer": "شاطئ"
+  },
+  {
+    "equation": "📱 + 💬 = ؟",
+    "answer": "مكالمة"
+  },
+  {
+    "equation": "🎽 + 🚲 + 🛤️ = ؟",
+    "answer": "رياضة"
+  },
+  {
+    "equation": "🥐 + 📰 = ؟",
+    "answer": "فطور"
+  },
+  {
+    "equation": "🧸 + 🍼 + 👶 = ؟",
+    "answer": "طفل"
+  },
+  {
+    "equation": "🔭 + 🔬 = ؟",
+    "answer": "علم"
+  },
+  {
+    "equation": "🎓 + 🏆 = ؟",
+    "answer": "تخرج"
+  },
+  {
+    "equation": "📷 + 🌅 = ؟",
+    "answer": "صورة"
+  },
+  {
+    "equation": "👟 + 🏃‍♂️ + 🕒 = ؟",
+    "answer": "جري"
+  },
+  {
+    "equation": "🏖️ + 🕶️ + 🌊 = ؟",
+    "answer": "شاطئ"
+  },
+  {
+    "equation": "🌈 + ☔ = ؟",
+    "answer": "مطر"
+  },
+  {
+    "equation": "❤️ + 💔 + 💕 = ؟",
+    "answer": "حب"
+  },
+  {
+    "equation": "📞 + 📱 + 💬 = ؟",
+    "answer": "مكالمة"
+  },
+  {
+    "equation": "🍷 + 🍽️ = ؟",
+    "answer": "عشاء"
+  },
+  {
+    "equation": "🏃‍♂️ + 🕒 = ؟",
+    "answer": "جري"
+  },
+  {
+    "equation": "📰 + ☕ + 🥐 = ؟",
+    "answer": "فطور"
+  },
+  {
+    "equation": "🏫 + ✏️ + 📚 = ؟",
+    "answer": "مدرسة"
+  },
+  {
+    "equation": "🛤️ + 🎽 + 🚲 = ؟",
+    "answer": "رياضة"
+  },
+  {
+    "equation": "🍿 + 🎬 + 🎟️ = ؟",
+    "answer": "سينما"
+  },
+  {
+    "equation": "✏️ + 📚 = ؟",
+    "answer": "مدرسة"
+  },
+  {
+    "equation": "🧼 + 🪥 = ؟",
+    "answer": "نظافة"
+  },
+  {
+    "equation": "🍉 + 🍦 + 🥤 = ؟",
+    "answer": "مرطبات"
+  },
+  {
+    "equation": "📞 + 💬 = ؟",
+    "answer": "مكالمة"
+  },
+  {
+    "equation": "🧼 + 🚿 + 🪥 = ؟",
+    "answer": "نظافة"
+  },
+  {
+    "equation": "🏫 + 📚 + ✏️ = ؟",
+    "answer": "مدرسة"
+  },
+  {
+    "equation": "☕ + 💻 + 📋 = ؟",
+    "answer": "عمل"
+  },
+  {
+    "equation": "🔬 + 🔭 = ؟",
+    "answer": "علم"
+  },
+  {
+    "equation": "📚 + 🏆 = ؟",
+    "answer": "تخرج"
+  },
+  {
+    "equation": "🖼️ + 🖌️ = ؟",
+    "answer": "فن"
+  },
+  {
+    "equation": "🍼 + 🍪 = ؟",
+    "answer": "وجبة"
+  },
+  {
+    "equation": "📋 + 💻 = ؟",
+    "answer": "عمل"
+  },
+  {
+    "equation": "🛏️ + 😴 = ؟",
+    "answer": "نوم"
+  },
+  {
+    "equation": "⚽ + 🏟️ + 🥅 = ؟",
+    "answer": "كرة"
+  },
+  {
+    "equation": "🛣️ + ⛽ + 🚗 = ؟",
+    "answer": "رحلة"
+  },
+  {
+    "equation": "👟 + 🏃‍♂️ = ؟",
+    "answer": "جري"
+  },
+  {
+    "equation": "🧪 + 🔭 = ؟",
+    "answer": "علم"
+  },
+  {
+    "equation": "🎨 + 🖼️ = ؟",
+    "answer": "فن"
+  },
+  {
+    "equation": "🛂 + 🧳 = ؟",
+    "answer": "سفر"
+  },
+  {
+    "equation": "🚿 + 🪥 + 🧼 = ؟",
+    "answer": "نظافة"
+  },
+  {
+    "equation": "🖼️ + 🎨 = ؟",
+    "answer": "فن"
+  },
+  {
+    "equation": "🕒 + 🏃‍♂️ = ؟",
+    "answer": "جري"
+  },
+  {
+    "equation": "🏊‍♂️ + 🏝️ = ؟",
+    "answer": "جزيرة"
+  },
+  {
+    "equation": "🏊‍♂️ + 🌴 = ؟",
+    "answer": "جزيرة"
+  },
+  {
+    "equation": "⛽ + 🚗 = ؟",
+    "answer": "رحلة"
+  },
+  {
+    "equation": "🎬 + 🍿 = ؟",
+    "answer": "سينما"
+  },
+  {
+    "equation": "☕ + 📰 = ؟",
+    "answer": "فطور"
+  },
+  {
+    "equation": "🍿 + 🎥 = ؟",
+    "answer": "ترفيه"
+  }
+      /* ... بقية المعادلات والإجابات ... */
+    ];
+
+    let players = [], scores = {}, currentIndex = -1, round = 1, timer = null;
+
+    function showInstructions() {
+      document.getElementById('instructions').classList.remove('hidden');
+      document.getElementById('setup').classList.add('hidden');
+      document.getElementById('gameArea').classList.add('hidden');
+    }
+    function showGame() {
+      document.getElementById('instructions').classList.add('hidden');
+      document.getElementById('setup').classList.remove('hidden');
+      // إذا بدأنا اللعبة بالفعل
+      if (players.length) {
+        document.getElementById('gameArea').classList.remove('hidden');
+      }
+    }
+
+    function setupPlayers() {
+      const count = +document.getElementById('playerCount').value;
+      players = []; scores = {};
+      for (let i = 0; i < count; i++) {
+        const name = prompt('اسم اللاعب ' + (i+1));
+        if (name) { players.push(name); scores[name] = 0; }
+      }
+      document.getElementById('setup').classList.add('hidden');
+      document.getElementById('instructions').classList.add('hidden');
+      document.getElementById('gameArea').classList.remove('hidden');
+      updatePlayers(); updateScores(); nextEquation();
+    }
+
+    function updatePlayers() {
+      const c = document.getElementById('playerBtns');
+      c.innerHTML = players.map(p=>`<div class="player" onclick="addPoint('${p}')">${p}</div>`).join('');
+    }
+
+    function nextEquation() {
+      clearInterval(timer);
+      currentIndex++;
+      if (currentIndex >= questions.length) { alert('انتهت الأسئلة'); return; }
+      document.getElementById('roundNumber').textContent = round++;
+      document.getElementById('equationBox').textContent = questions[currentIndex].equation;
+      document.getElementById('answerBox').textContent = '';
+      document.getElementById('showAnswerBtn').style.display = 'inline-block';
+      document.getElementById('timerDisplay').textContent = '--';
+      document.getElementById('nextBtn').classList.add('hidden');
+    }
+
+    function showAnswer() {
+      document.getElementById('answerBox').textContent = questions[currentIndex].answer;
+      document.getElementById('showAnswerBtn').style.display = 'none';
+    }
+
+    function copyEquation() {
+      navigator.clipboard.writeText(questions[currentIndex].equation);
+      alert('تم نسخ المعادلة');
+    }
+
+    function startTimer() {
+      clearInterval(timer);
+      let t = +document.getElementById('timeInput').value;
+      const d = document.getElementById('timerDisplay');
+      d.textContent = t;
+      timer = setInterval(()=>{
+        t--; d.textContent = t;
+        if (t<=0) { clearInterval(timer); document.getElementById('nextBtn').classList.remove('hidden'); }
+      },1000);
+    }
+
+    function addPoint(p) {
+      scores[p] = (scores[p]||0) + 1; updateScores();
+      document.getElementById('nextBtn').classList.remove('hidden');
+    }
+
+    function updateScores() {
+      document.getElementById('scoreBoard').innerHTML =
+        players.map(p=>`<li>${p}: ${scores[p]} نقطة</li>`).join('');
+    }
+
+    function nextRound() { nextEquation(); }
+
+    function endGame() {
+      const winner = Object.entries(scores).sort((a,b)=>b[1]-a[1])[0];
+      document.getElementById('gameArea').innerHTML +=
+        `<h2>اللعبة انتهت!</h2><h3>الفائز: ${winner[0]} بـ ${winner[1]} نقطة</h3>`;
+    }
+  </script>
+</body>
+</html>
